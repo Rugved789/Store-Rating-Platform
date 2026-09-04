@@ -9,6 +9,7 @@ const router = express.Router();
  */
 
 // Public routes (no auth required)
+router.post('/signup', AuthController.signup);
 router.post('/login', AuthController.login);
 router.post('/logout', AuthController.logout);
 

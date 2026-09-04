@@ -1,7 +1,20 @@
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
+// Load environment variables
+require('dotenv').config();
+
+// Create connection pool for seeding
+const pool = new Pool({
+  connectionString: "postgresql://neondb_owner:npg_6ILD4oAQKiFl@ep-shiny-waterfall-aym4asq8-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require",
+});
+
+// Create Prisma Client with adapter for seeding
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ pool }),
+});
 
 /**
  * Seed Script - Initialize database with test data

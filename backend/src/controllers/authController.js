@@ -2,9 +2,86 @@ const UserService = require('../services/userService');
 const JWTUtil = require('../utils/jwt');
 
 /**
- * Authentication Controller - Handle login and logout operations
+ * Authentication Controller - Handle login, logout, and signup operations
  */
 class AuthController {
+  /**
+   * Signup new user
+   * POST /auth/signup
+   * @param {Request} req - Express request object
+   * @param {Response} res - Express response object
+   */
+  static async signup(req, res) {
+    try {
+      const { name, email, password } = req.body;
+
+      // Validate input
+      if (!name || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: 'Name, email, and password are required',
+        });
+      }
+
+      // Create user (UserService will handle validation and hashing)
+      const user = await UserService.createUser({
+        name,
+        email,
+        password,
+        role: 'USER', // Default role for signup
+      });
+
+      // Generate JWT token
+      const token = JWTUtil.generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      // Set httpOnly cookie with token
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      });
+
+      // Return user data without token (token is in cookie)
+      return res.status(201).json({
+        success: true,
+        data: {
+          user,
+          message: 'Signup successful',
+        },
+        error: null,
+      });
+    } catch (error) {
+      // Handle specific error cases
+      if (error.message.includes('User with this email already exists')) {
+        return res.status(409).json({
+          success: false,
+          data: null,
+          error: 'User with this email already exists',
+        });
+      }
+
+      if (error.message.includes('are required')) {
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: error.message,
+        });
+      }
+
+      // Generic server error
+      return res.status(500).json({
+        success: false,
+        data: null,
+        error: 'Signup failed. Please try again.',
+      });
+    }
+  }
   /**
    * Login user
    * POST /auth/login
