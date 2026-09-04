@@ -1,0 +1,76 @@
+// This is your Prisma schema file for Store Rating Platform
+// Database: Neon PostgreSQL (serverless)
+
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User roles enum
+enum UserRole {
+  ADMIN
+  USER
+  STORE_OWNER
+}
+
+// User model
+model User {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(60)
+  email     String   @unique
+  passwordHash String
+  address   String?  @db.VarChar(400)
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownedStores Store[]
+  ratings     Rating[]
+
+  // Indexes for frequently queried columns
+  @@index([email])
+  @@index([role])
+  @@index([name])
+}
+
+// Store model
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  address   String   @db.VarChar(400)
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ratings   Rating[]
+
+  // Indexes for frequently queried columns
+  @@index([ownerId])
+  @@index([name])
+}
+
+// Rating model with unique constraint on user + store
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  storeId   String
+  rating    Int      @db.SmallInt // 1-5 scale
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Unique constraint: a user can only rate a store once (but can update)
+  @@unique([userId, storeId])
+  // Indexes for frequently queried columns
+  @@index([userId])
+  @@index([storeId])
+}
