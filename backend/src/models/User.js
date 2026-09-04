@@ -1,7 +1,9 @@
 const prisma = require('./prismaClient');
+const prismaClientDirect = require('./prismaClientDirect');
 
 /**
  * User Repository - Data access layer for User operations
+ * Uses direct pg client for critical queries to bypass Prisma adapter issues
  */
 class UserRepository {
   /**
@@ -10,7 +12,8 @@ class UserRepository {
    * @returns {Promise<Object|null>} User object or null if not found
    */
   static async findByEmail(email) {
-    return prisma.user.findUnique({
+    // Use direct client to bypass Prisma adapter issues
+    return prismaClientDirect.user.findUnique({
       where: { email },
     });
   }
@@ -21,7 +24,8 @@ class UserRepository {
    * @returns {Promise<Object|null>} User object or null if not found
    */
   static async findById(id) {
-    return prisma.user.findUnique({
+    // Use direct client to bypass Prisma adapter issues
+    return prismaClientDirect.user.findUnique({
       where: { id },
     });
   }
@@ -32,7 +36,8 @@ class UserRepository {
    * @returns {Promise<Object>} Created user object
    */
   static async create(data) {
-    return prisma.user.create({
+    // Use direct client for write operations
+    return prismaClientDirect.user.create({
       data,
     });
   }
@@ -44,7 +49,8 @@ class UserRepository {
    * @returns {Promise<Object>} Updated user object
    */
   static async update(id, data) {
-    return prisma.user.update({
+    // Use direct client for write operations
+    return prismaClientDirect.user.update({
       where: { id },
       data,
     });
@@ -56,7 +62,8 @@ class UserRepository {
    * @returns {Promise<Object>} Deleted user object
    */
   static async delete(id) {
-    return prisma.user.delete({
+    // Use direct client for write operations
+    return prismaClientDirect.user.delete({
       where: { id },
     });
   }
@@ -91,7 +98,7 @@ class UserRepository {
     }
 
     const [data, total] = await Promise.all([
-      prisma.user.findMany({
+      prismaClientDirect.user.findMany({
         where,
         skip,
         take: limit,
@@ -106,7 +113,7 @@ class UserRepository {
           updatedAt: true,
         },
       }),
-      prisma.user.count({ where }),
+      prismaClientDirect.user.count({ where }),
     ]);
 
     return { data, total };
@@ -117,7 +124,7 @@ class UserRepository {
    * @returns {Promise<number>} Total user count
    */
   static async count() {
-    return prisma.user.count();
+    return prismaClientDirect.user.count();
   }
 }
 

@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
  * Restricts access based on authentication and role
  */
 export const ProtectedRoute = ({ children, requiredRole = null }) => {
-  const { isAuthenticated, userRole, loading } = useAuth();
+  const { isAuthenticated, userRole, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -17,13 +17,15 @@ export const ProtectedRoute = ({ children, requiredRole = null }) => {
     );
   }
 
-  // Check if user is authenticated
-  if (!isAuthenticated) {
+  // Check if user is authenticated (has user object with id)
+  if (!isAuthenticated || !user || !user.id) {
+    console.warn('Not authenticated - redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   // Check if user has required role
   if (requiredRole && userRole !== requiredRole) {
+    console.warn(`Role mismatch - required: ${requiredRole}, actual: ${userRole}`);
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -33,9 +35,10 @@ export const ProtectedRoute = ({ children, requiredRole = null }) => {
 /**
  * Public Route Component
  * Redirects to dashboard if user is already authenticated
+ * Shows the component if user is NOT authenticated
  */
 export const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -45,8 +48,9 @@ export const PublicRoute = ({ children }) => {
     );
   }
 
-  // Redirect to dashboard if already authenticated
-  if (isAuthenticated) {
+  // Only allow access if NOT authenticated (no user object)
+  if (isAuthenticated && user && user.id) {
+    console.warn('User already authenticated - redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 

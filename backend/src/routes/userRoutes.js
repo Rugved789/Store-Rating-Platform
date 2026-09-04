@@ -3,7 +3,6 @@ const authMiddleware = require('../middleware/auth');
 const validateRequest = require('../middleware/validateRequest');
 const UserController = require('../controllers/userController');
 const {
-  signupValidator,
   submitRatingValidator,
   updatePasswordValidator,
 } = require('../validators/userValidators');
@@ -12,15 +11,8 @@ const router = express.Router();
 
 /**
  * User Routes
+ * Mounted at /auth, so these become /auth/stores, /auth/update-password, /auth/profile, etc.
  */
-
-// Public routes (no auth required)
-router.post(
-  '/auth/signup',
-  signupValidator,
-  validateRequest,
-  UserController.signup
-);
 
 // Protected routes (auth required)
 router.get('/stores', authMiddleware, UserController.getStores);
@@ -32,12 +24,12 @@ router.post(
   UserController.submitRating
 );
 router.post(
-  '/auth/update-password',
+  '/update-password',
   authMiddleware,
   updatePasswordValidator,
   validateRequest,
   UserController.updatePassword
 );
-router.get('/auth/profile', authMiddleware, UserController.getProfile);
+router.get('/profile', authMiddleware, UserController.getProfile);
 
 module.exports = router;

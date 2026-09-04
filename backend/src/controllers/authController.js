@@ -2,6 +2,14 @@ const UserService = require('../services/userService');
 const JWTUtil = require('../utils/jwt');
 const SignupHelper = require('../models/signupHelper');
 
+const getTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: 24 * 60 * 60 * 1000,
+  path: '/',
+});
+
 /**
  * Authentication Controller - Handle login, logout, and signup operations
  */
@@ -41,12 +49,7 @@ class AuthController {
       });
 
       // Set httpOnly cookie with token
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      });
+      res.cookie('token', token, getTokenCookieOptions());
 
       // Return user data without token (token is in cookie)
       return res.status(201).json({
@@ -84,6 +87,7 @@ class AuthController {
       });
     }
   }
+
   /**
    * Login user
    * POST /auth/login
@@ -114,12 +118,7 @@ class AuthController {
       });
 
       // Set httpOnly cookie with token
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      });
+      res.cookie('token', token, getTokenCookieOptions());
 
       // Return user data without token (token is in cookie)
       return res.status(200).json({
@@ -148,11 +147,12 @@ class AuthController {
    */
   static logout(req, res) {
     try {
-      // Clear token cookie
+      // Clear token cookie with the same options used when it was created.
       res.clearCookie('token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
+        path: '/',
       });
 
       return res.status(200).json({

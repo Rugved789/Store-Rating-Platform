@@ -15,23 +15,31 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   /**
-   * Configure axios to use credentials (cookies)
+   * Configure axios globally for all requests
    */
   axios.defaults.baseURL = API_BASE;
-  axios.defaults.withCredentials = true;
+  axios.defaults.withCredentials = true; // CRITICAL: Send cookies with every request
 
   /**
-   * Check if user is already logged in (on mount)
+   * Check if user is already logged in (runs once on mount)
    */
   useEffect(() => {
     const checkAuth = async () => {
+      console.log('🔍 Checking authentication on app load...');
       try {
-        const response = await axios.get('/auth/me');
-        if (response.data.success) {
-          setUser(response.data.data);
+        const response = await axios.get('/auth/me', {
+          withCredentials: true
+        });
+        
+        if (response.data.success && response.data.data.user) {
+          console.log('✅ User authenticated:', response.data.data.user.email);
+          setUser(response.data.data.user);
+        } else {
+          console.log('❌ Auth check returned no user data');
+          setUser(null);
         }
       } catch (err) {
-        // User not authenticated, which is expected
+        console.log('❌ Auth check failed (not logged in):', err.response?.status);
         setUser(null);
       } finally {
         setLoading(false);
@@ -39,23 +47,33 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuth();
-  }, []);
+  }, []); // Empty dependency array = runs only once on mount
 
   /**
    * Login user
    */
   const login = useCallback(async (email, password) => {
     try {
+      console.log('🔐 Attempting login with:', email);
       setError(null);
-      const response = await axios.post('/auth/login', { email, password });
+      
+      const response = await axios.post('/auth/login', 
+        { email, password },
+        { withCredentials: true }
+      );
 
-      if (response.data.success) {
+      if (response.data.success && response.data.data.user) {
+        console.log('✅ Login successful:', response.data.data.user.email);
         setUser(response.data.data.user);
         return { success: true, data: response.data.data };
       }
+      
+      throw new Error('Invalid login response');
     } catch (err) {
-      const message = err.response?.data?.error?.message || 'Login failed';
+      const message = err.response?.data?.error || err.message || 'Login failed';
+      console.error('❌ Login error:', message);
       setError(message);
+      setUser(null);
       return { success: false, error: message };
     }
   }, []);
@@ -65,15 +83,23 @@ export const AuthProvider = ({ children }) => {
    */
   const signup = useCallback(async (name, email, password) => {
     try {
+      console.log('📝 Attempting signup with:', email);
       setError(null);
-      const response = await axios.post('/auth/signup', { name, email, password });
+      
+      const response = await axios.post('/auth/signup', 
+        { name, email, password },
+        { withCredentials: true }
+      );
 
       if (response.data.success) {
-        // Don't auto-login after signup
+        console.log('✅ Signup successful, please login');
         return { success: true, message: 'Signup successful. Please login.' };
       }
+      
+      throw new Error('Invalid signup response');
     } catch (err) {
-      const message = err.response?.data?.error?.message || 'Signup failed';
+      const message = err.response?.data?.error || err.message || 'Signup failed';
+      console.error('❌ Signup error:', message);
       setError(message);
       return { success: false, error: message };
     }
@@ -81,17 +107,31 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Logout user
+   * CRITICAL: Clear user state BEFORE redirecting
    */
   const logout = useCallback(async () => {
     try {
-      setError(null);
-      await axios.post('/auth/logout');
+      console.log('🚪 Starting logout...');
+      
+      // Step 1: Clear frontend state immediately
       setUser(null);
+      setError(null);
+      
+      // Step 2: Tell backend to clear cookie
+      try {
+        await axios.post('/auth/logout', {}, { withCredentials: true });
+        console.log('✅ Backend logout successful');
+      } catch (err) {
+        console.warn('⚠️ Backend logout failed (but frontend cleared):', err.message);
+        // Continue anyway - frontend is already cleared
+      }
+      
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.error?.message || 'Logout failed';
-      setError(message);
-      return { success: false, error: message };
+      console.error('❌ Logout error:', err.message);
+      // Even if error, still clear frontend
+      setUser(null);
+      return { success: true };
     }
   }, []);
 
@@ -110,7 +150,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, message: 'Password updated successfully' };
       }
     } catch (err) {
-      const message = err.response?.data?.error?.message || 'Password update failed';
+      const message = err.response?.data?.error || 'Password update failed';
       setError(message);
       return { success: false, error: message };
     }
@@ -125,11 +165,11 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get('/auth/profile');
 
       if (response.data.success) {
-        setUser(response.data.data);
-        return { success: true, data: response.data.data };
+        setUser(response.data.data.user);
+        return { success: true, data: response.data.data.user };
       }
     } catch (err) {
-      const message = err.response?.data?.error?.message || 'Failed to fetch profile';
+      const message = err.response?.data?.error || 'Failed to fetch profile';
       setError(message);
       return { success: false, error: message };
     }
@@ -145,9 +185,19 @@ export const AuthProvider = ({ children }) => {
     logout,
     updatePassword,
     getProfile,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!user.id,
     userRole: user?.role || null,
   };
+
+  // Debug: Log auth state changes
+  useEffect(() => {
+    console.log('🔄 Auth state updated:', {
+      isAuthenticated: !!user?.id,
+      userEmail: user?.email,
+      userRole: user?.role,
+      loading
+    });
+  }, [user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -1,9 +1,22 @@
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:5000';
 
 // Configure axios to send cookies with requests
 axios.defaults.withCredentials = true;
+
+// Add response interceptor to handle 401 errors
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // If 401 Unauthorized, don't treat as error - let the component handle it
+    if (error.response?.status === 401) {
+      console.warn('Unauthorized request - check authentication');
+    }
+    return Promise.reject(error);
+  }
+);
 
 /**
  * Admin API Service

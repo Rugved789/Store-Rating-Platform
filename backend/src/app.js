@@ -42,6 +42,8 @@ app.use('/auth', authRoutes);
 app.use('/admin', adminRoutes);
 
 // Routes: User (auth required or public for signup)
+// User routes are mounted at /auth (not /user)
+// Routes: /auth/signup, /auth/stores, /auth/stores/:storeId/ratings, /auth/update-password, /auth/profile
 app.use('/auth', userRoutes);
 
 // Routes: Store Owner (auth + store owner role required)

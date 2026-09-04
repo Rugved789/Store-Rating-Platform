@@ -34,15 +34,20 @@ export const AdminStores = () => {
     setLoading(true);
     setError('');
 
+    console.log('Fetching stores...');
     const result = await adminService.getStores({
       page: pagination.page,
       limit: pagination.limit,
     });
 
+    console.log('Stores result:', result);
+
     if (result.success) {
+      console.log('Stores fetched successfully:', result.data);
       setStores(result.data);
       setPagination(result.pagination);
     } else {
+      console.error('Error fetching stores:', result.error);
       setError(result.error);
     }
 

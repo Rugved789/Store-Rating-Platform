@@ -1,5 +1,5 @@
-// Direct stores helper using native pg client
-const { Client } = require('pg');
+// Direct stores helper using the global DirectSQLClient pool
+const DirectSQLClient = require('./prismaClientDirect');
 
 class StoresHelper {
   /**
@@ -16,53 +16,47 @@ class StoresHelper {
       address,
     } = options;
 
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL
-    });
+    const skip = (page - 1) * limit;
+    const filterParams = [];
+    let whereConditions = [];
+    let paramCount = 1;
+
+    // Build WHERE clause based on filters
+    if (search) {
+      whereConditions.push(`(s.name ILIKE $${paramCount} OR s.address ILIKE $${paramCount})`);
+      filterParams.push(`%${search}%`);
+      paramCount++;
+    } else {
+      if (name) {
+        whereConditions.push(`s.name ILIKE $${paramCount}`);
+        filterParams.push(`%${name}%`);
+        paramCount++;
+      }
+      if (address) {
+        whereConditions.push(`s.address ILIKE $${paramCount}`);
+        filterParams.push(`%${address}%`);
+        paramCount++;
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Determine sort column
+    const validSortColumns = ['createdAt', 'name', 'email', 'address'];
+    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'createdAt';
+    const orderDirection = sortOrder?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     try {
-      await client.connect();
-
-      const skip = (page - 1) * limit;
-      let whereClause = '';
-      const params = [];
-      let paramCount = 1;
-
-      // Build WHERE clause based on filters
-      if (search) {
-        whereClause = `WHERE s.name ILIKE $${paramCount} OR s.address ILIKE $${paramCount}`;
-        params.push(`%${search}%`);
-        paramCount++;
-      } else {
-        const conditions = [];
-        if (name) {
-          conditions.push(`s.name ILIKE $${paramCount}`);
-          params.push(`%${name}%`);
-          paramCount++;
-        }
-        if (address) {
-          conditions.push(`s.address ILIKE $${paramCount}`);
-          params.push(`%${address}%`);
-          paramCount++;
-        }
-        if (conditions.length > 0) {
-          whereClause = `WHERE ${conditions.join(' AND ')}`;
-        }
-      }
-
-      // Determine sort column
-      const validSortColumns = ['createdAt', 'name', 'email', 'address'];
-      const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'createdAt';
-      const orderDirection = sortOrder?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-
       // Get total count
-      const countResult = await client.query(
-        `SELECT COUNT(*) as total FROM "Store" s ${whereClause}`,
-        params
-      );
+      const countSql = `SELECT COUNT(*) as total FROM "Store" s ${whereClause}`;
+      const countResult = await DirectSQLClient.query(countSql, filterParams);
       const total = parseInt(countResult.rows[0].total);
 
       // Get stores with ratings
+      // Parameters: first userId (for CASE WHEN), then filter params, then limit and offset
+      const allParams = [userId, ...filterParams, limit, skip];
+      const finalParamCount = paramCount + 1; // userId is first, then filter params
+
       const storesQuery = `
         SELECT 
           s.id,
@@ -74,17 +68,16 @@ class StoresHelper {
           s."updatedAt",
           COALESCE(AVG(r.rating)::numeric(3,2), null) as "averageRating",
           COUNT(r.id) as "totalRatings",
-          MAX(CASE WHEN r."userId" = $${paramCount} THEN r.rating END) as "userRating"
+          MAX(CASE WHEN r."userId" = $1 THEN r.rating END) as "userRating"
         FROM "Store" s
         LEFT JOIN "Rating" r ON s.id = r."storeId"
         ${whereClause}
         GROUP BY s.id, s.name, s.email, s.address, s."ownerId", s."createdAt", s."updatedAt"
         ORDER BY s."${sortColumn}" ${orderDirection}
-        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+        LIMIT $${finalParamCount} OFFSET $${finalParamCount + 1}
       `;
 
-      const storesParams = [...params, userId, limit, skip];
-      const storesResult = await client.query(storesQuery, storesParams);
+      const storesResult = await DirectSQLClient.query(storesQuery, allParams);
 
       const stores = storesResult.rows.map(row => ({
         id: row.id,
@@ -100,9 +93,9 @@ class StoresHelper {
       }));
 
       return { data: stores, total };
-
-    } finally {
-      await client.end();
+    } catch (error) {
+      console.error('StoresHelper.getStoresWithRatings error:', error);
+      throw error;
     }
   }
 
@@ -110,27 +103,13 @@ class StoresHelper {
    * Get store by ID with ratings
    */
   static async getStoreById(storeId) {
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL
-    });
-
-    try {
-      await client.connect();
-
-      const result = await client.query(
-        `SELECT * FROM "Store" WHERE id = $1`,
-        [storeId]
-      );
-
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      return result.rows[0];
-
-    } finally {
-      await client.end();
-    }
+    const sql = `
+      SELECT s.id, s.name, s.email, s.address, s."ownerId", s."createdAt", s."updatedAt"
+      FROM "Store" s
+      WHERE s.id = $1
+    `;
+    const result = await DirectSQLClient.query(sql, [storeId]);
+    return result.rows[0] || null;
   }
 
   /**
@@ -147,41 +126,35 @@ class StoresHelper {
       address,
     } = options;
 
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL
-    });
+    const skip = (page - 1) * limit;
+    let whereClause = '';
+    const params = [];
+    let paramCount = 1;
+
+    // Build WHERE clause
+    const conditions = [];
+    if (name) {
+      conditions.push(`name ILIKE $${paramCount}`);
+      params.push(`%${name}%`);
+      paramCount++;
+    }
+    if (email) {
+      conditions.push(`email ILIKE $${paramCount}`);
+      params.push(`%${email}%`);
+      paramCount++;
+    }
+    if (address) {
+      conditions.push(`address ILIKE $${paramCount}`);
+      params.push(`%${address}%`);
+      paramCount++;
+    }
+    if (conditions.length > 0) {
+      whereClause = `WHERE ${conditions.join(' AND ')}`;
+    }
 
     try {
-      await client.connect();
-
-      const skip = (page - 1) * limit;
-      let whereClause = '';
-      const params = [];
-      let paramCount = 1;
-
-      // Build WHERE clause
-      const conditions = [];
-      if (name) {
-        conditions.push(`name ILIKE $${paramCount}`);
-        params.push(`%${name}%`);
-        paramCount++;
-      }
-      if (email) {
-        conditions.push(`email ILIKE $${paramCount}`);
-        params.push(`%${email}%`);
-        paramCount++;
-      }
-      if (address) {
-        conditions.push(`address ILIKE $${paramCount}`);
-        params.push(`%${address}%`);
-        paramCount++;
-      }
-      if (conditions.length > 0) {
-        whereClause = `WHERE ${conditions.join(' AND ')}`;
-      }
-
       // Get total count
-      const countResult = await client.query(
+      const countResult = await DirectSQLClient.query(
         `SELECT COUNT(*) as total FROM "Store" ${whereClause}`,
         params
       );
@@ -200,12 +173,12 @@ class StoresHelper {
       `;
 
       const storesParams = [...params, limit, skip];
-      const storesResult = await client.query(storesQuery, storesParams);
+      const storesResult = await DirectSQLClient.query(storesQuery, storesParams);
 
       return { data: storesResult.rows, total };
-
-    } finally {
-      await client.end();
+    } catch (error) {
+      console.error('StoresHelper.getAllStores error:', error);
+      throw error;
     }
   }
 }

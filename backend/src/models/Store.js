@@ -1,7 +1,8 @@
-const prisma = require('./prismaClient');
+const DirectSQLClient = require('./prismaClientDirect');
 
 /**
  * Store Repository - Data access layer for Store operations
+ * Uses direct SQL to bypass Prisma adapter issues
  */
 class StoreRepository {
   /**
@@ -10,18 +11,31 @@ class StoreRepository {
    * @returns {Promise<Object|null>} Store object or null if not found
    */
   static async findById(id) {
-    return prisma.store.findUnique({
-      where: { id },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const sql = `
+      SELECT s.id, s.name, s.email, s.address, s."ownerId", s."createdAt", s."updatedAt",
+             u.id as "owner_id", u.name as "owner_name", u.email as "owner_email"
+      FROM "Store" s
+      LEFT JOIN "User" u ON s."ownerId" = u.id
+      WHERE s.id = $1
+    `;
+    const result = await DirectSQLClient.query(sql, [id]);
+    if (!result.rows[0]) return null;
+    
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      address: row.address,
+      ownerId: row.ownerId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      owner: row.owner_id ? {
+        id: row.owner_id,
+        name: row.owner_name,
+        email: row.owner_email,
+      } : null,
+    };
   }
 
   /**
@@ -30,18 +44,27 @@ class StoreRepository {
    * @returns {Promise<Object>} Created store object
    */
   static async create(data) {
-    return prisma.store.create({
-      data,
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const { name, email, address, ownerId } = data;
+    const sql = `
+      INSERT INTO "Store" (id, name, email, address, "ownerId", "createdAt", "updatedAt")
+      VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), NOW())
+      RETURNING id, name, email, address, "ownerId", "createdAt", "updatedAt"
+    `;
+    const result = await DirectSQLClient.query(sql, [name, email, address || null, ownerId || null]);
+    const store = result.rows[0];
+    
+    // Get owner info if ownerId exists
+    if (store.ownerId) {
+      const ownerResult = await DirectSQLClient.query(
+        'SELECT id, name, email FROM "User" WHERE id = $1',
+        [store.ownerId]
+      );
+      if (ownerResult.rows[0]) {
+        store.owner = ownerResult.rows[0];
+      }
+    }
+    
+    return store;
   }
 
   /**
@@ -51,19 +74,23 @@ class StoreRepository {
    * @returns {Promise<Object>} Updated store object
    */
   static async update(id, data) {
-    return prisma.store.update({
-      where: { id },
-      data,
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+    const updates = [];
+    const params = [id];
+    let paramIndex = 2;
+
+    Object.entries(data).forEach(([key, value]) => {
+      updates.push(`${key} = $${paramIndex}`);
+      params.push(value);
+      paramIndex++;
     });
+
+    const sql = `
+      UPDATE "Store" SET ${updates.join(', ')}, "updatedAt" = NOW()
+      WHERE id = $1
+      RETURNING id, name, email, address, "ownerId", "createdAt", "updatedAt"
+    `;
+    const result = await DirectSQLClient.query(sql, params);
+    return result.rows[0];
   }
 
   /**
@@ -72,9 +99,9 @@ class StoreRepository {
    * @returns {Promise<Object>} Deleted store object
    */
   static async delete(id) {
-    return prisma.store.delete({
-      where: { id },
-    });
+    const sql = 'DELETE FROM "Store" WHERE id = $1 RETURNING id, name, email, address';
+    const result = await DirectSQLClient.query(sql, [id]);
+    return result.rows[0];
   }
 
   /**
@@ -94,57 +121,67 @@ class StoreRepository {
     } = options;
 
     const skip = (page - 1) * limit;
-    const where = {};
+    let whereConditions = [];
+    let params = [];
+    let paramIndex = 1;
 
     if (name) {
-      where.name = { contains: name, mode: 'insensitive' };
+      whereConditions.push(`s.name ILIKE $${paramIndex}`);
+      params.push(`%${name}%`);
+      paramIndex++;
     }
     if (email) {
-      where.email = { contains: email, mode: 'insensitive' };
+      whereConditions.push(`s.email ILIKE $${paramIndex}`);
+      params.push(`%${email}%`);
+      paramIndex++;
     }
     if (address) {
-      where.address = { contains: address, mode: 'insensitive' };
+      whereConditions.push(`s.address ILIKE $${paramIndex}`);
+      params.push(`%${address}%`);
+      paramIndex++;
     }
 
-    const [data, total] = await Promise.all([
-      prisma.store.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          ratings: {
-            select: {
-              rating: true,
-            },
-          },
-        },
-      }),
-      prisma.store.count({ where }),
-    ]);
+    const whereClause = whereConditions.length > 0 ? ` WHERE ${whereConditions.join(' AND ')}` : '';
+    
+    // Count total
+    const countSql = `SELECT COUNT(*) as count FROM "Store" s${whereClause}`;
+    const countResult = await DirectSQLClient.query(countSql, params);
+    const total = parseInt(countResult.rows[0].count, 10);
 
-    // Calculate average rating for each store
-    const storesWithRatings = data.map((store) => {
-      const avgRating =
-        store.ratings.length > 0
-          ? (store.ratings.reduce((sum, r) => sum + r.rating, 0) / store.ratings.length).toFixed(2)
-          : null;
+    // Get data with ratings
+    const dataSql = `
+      SELECT s.id, s.name, s.email, s.address, s."ownerId", s."createdAt", s."updatedAt",
+             u.id as "owner_id", u.name as "owner_name", u.email as "owner_email",
+             AVG(r.rating)::numeric(10,2) as "avgRating", COUNT(r.id)::int as "ratingCount"
+      FROM "Store" s
+      LEFT JOIN "User" u ON s."ownerId" = u.id
+      LEFT JOIN "Rating" r ON s.id = r."storeId"
+      ${whereClause}
+      GROUP BY s.id, u.id
+      ORDER BY s.${sortBy} ${sortOrder.toUpperCase()}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    params.push(limit, skip);
+    
+    const result = await DirectSQLClient.query(dataSql, params);
+    
+    const data = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      address: row.address,
+      ownerId: row.ownerId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      owner: row.owner_id ? {
+        id: row.owner_id,
+        name: row.owner_name,
+        email: row.owner_email,
+      } : null,
+      averageRating: row.avgRating ? parseFloat(row.avgRating) : null,
+    }));
 
-      return {
-        ...store,
-        averageRating: avgRating ? parseFloat(avgRating) : null,
-        ratings: undefined, // Remove ratings array from response
-      };
-    });
-
-    return { data: storesWithRatings, total };
+    return { data, total };
   }
 
   /**
@@ -152,7 +189,9 @@ class StoreRepository {
    * @returns {Promise<number>} Total store count
    */
   static async count() {
-    return prisma.store.count();
+    const sql = 'SELECT COUNT(*) as count FROM "Store"';
+    const result = await DirectSQLClient.query(sql, []);
+    return parseInt(result.rows[0].count, 10);
   }
 
   /**
@@ -161,37 +200,34 @@ class StoreRepository {
    * @returns {Promise<Object>} Store with average rating
    */
   static async getStoreWithAverageRating(storeId) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        ratings: {
-          select: {
-            rating: true,
-          },
-        },
-      },
-    });
-
-    if (!store) {
-      return null;
-    }
-
-    const avgRating =
-      store.ratings.length > 0
-        ? (store.ratings.reduce((sum, r) => sum + r.rating, 0) / store.ratings.length).toFixed(2)
-        : null;
-
+    const sql = `
+      SELECT s.id, s.name, s.email, s.address, s."ownerId", s."createdAt", s."updatedAt",
+             u.id as "owner_id", u.name as "owner_name", u.email as "owner_email",
+             AVG(r.rating)::numeric(10,2) as "avgRating"
+      FROM "Store" s
+      LEFT JOIN "User" u ON s."ownerId" = u.id
+      LEFT JOIN "Rating" r ON s.id = r."storeId"
+      WHERE s.id = $1
+      GROUP BY s.id, u.id
+    `;
+    const result = await DirectSQLClient.query(sql, [storeId]);
+    if (!result.rows[0]) return null;
+    
+    const row = result.rows[0];
     return {
-      ...store,
-      averageRating: avgRating ? parseFloat(avgRating) : null,
-      ratings: undefined,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      address: row.address,
+      ownerId: row.ownerId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      owner: row.owner_id ? {
+        id: row.owner_id,
+        name: row.owner_name,
+        email: row.owner_email,
+      } : null,
+      averageRating: row.avgRating ? parseFloat(row.avgRating) : null,
     };
   }
 }

@@ -5,6 +5,7 @@ import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 import { Loading } from './components/Loading';
 
 // Pages
+import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
@@ -24,9 +25,14 @@ const Layout = ({ children }) => {
   const handleLogout = async () => {
     const result = await logout();
     if (result.success) {
-      window.location.href = '/login';
+      window.location.href = '/';
     }
   };
+
+  // Only show authenticated UI if user object exists AND has required fields
+  const userIsLoggedIn = !!user && !!user.id && !!user.email;
+
+  console.log('Layout render - user:', user, 'isAuthenticated:', isAuthenticated, 'userIsLoggedIn:', userIsLoggedIn);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -48,7 +54,7 @@ const Layout = ({ children }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          {isAuthenticated ? (
+          {userIsLoggedIn ? (
             <>
               <span>{user?.name}</span>
               <span style={{ fontSize: '0.9rem', color: '#ccc' }}>({user?.role})</span>
@@ -103,7 +109,7 @@ const Layout = ({ children }) => {
  * Routes Wrapper
  */
 const AppRoutes = () => {
-  const { loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
 
   if (loading) {
     return <Loading message="Initializing..." />;
@@ -112,7 +118,10 @@ const AppRoutes = () => {
   return (
     <Layout>
       <Routes>
-        {/* Public Routes */}
+        {/* Home Page - Public, accessible to everyone */}
+        <Route path="/" element={<Home />} />
+
+        {/* Public Routes - Redirects to dashboard if already logged in */}
         <Route
           path="/login"
           element={
@@ -189,9 +198,8 @@ const AppRoutes = () => {
         {/* Error Pages */}
         <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Fallback Routes */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Fallback - redirect unknown routes to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
