@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const UserRepository = require('../models/User');
+const prismaClientDirect = require('../models/prismaClientDirect');
 
 /**
  * User Service - Business logic for user operations
@@ -34,7 +35,9 @@ class UserService {
     const { email, password, name, address, role } = userData;
 
     // Check if user already exists
-    const existingUser = await UserRepository.findByEmail(email);
+    const existingUser = await prismaClientDirect.user.findUnique({
+      where: { email }
+    });
     if (existingUser) {
       throw new Error('User with this email already exists');
     }
@@ -47,13 +50,15 @@ class UserService {
     // Hash password
     const passwordHash = await this.hashPassword(password);
 
-    // Create user
-    const user = await UserRepository.create({
-      email,
-      name,
-      address: address || null,
-      passwordHash,
-      role: role || 'USER',
+    // Create user using direct client
+    const user = await prismaClientDirect.user.create({
+      data: {
+        email,
+        name,
+        address: address || null,
+        passwordHash,
+        role: role || 'USER',
+      }
     });
 
     // Return user without password hash
@@ -67,7 +72,9 @@ class UserService {
    * @returns {Promise<Object>} Authenticated user (without password hash)
    */
   static async authenticate(email, password) {
-    const user = await UserRepository.findByEmail(email);
+    const user = await prismaClientDirect.user.findUnique({
+      where: { email }
+    });
 
     if (!user) {
       throw new Error('Invalid email or password');

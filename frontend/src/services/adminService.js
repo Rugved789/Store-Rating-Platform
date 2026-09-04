@@ -2,6 +2,9 @@ import axios from 'axios';
 
 const API_BASE = 'http://localhost:5000';
 
+// Configure axios to send cookies with requests
+axios.defaults.withCredentials = true;
+
 /**
  * Admin API Service
  */
@@ -11,12 +14,14 @@ export const adminService = {
    */
   getDashboard: async () => {
     try {
-      const response = await axios.get(`${API_BASE}/admin/dashboard`);
+      const response = await axios.get(`${API_BASE}/admin/dashboard`, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error?.message || 'Failed to fetch dashboard',
+        error: error.response?.data?.error || 'Failed to fetch dashboard',
       };
     }
   },
@@ -26,7 +31,10 @@ export const adminService = {
    */
   getStores: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_BASE}/admin/stores`, { params });
+      const response = await axios.get(`${API_BASE}/admin/stores`, { 
+        params,
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {

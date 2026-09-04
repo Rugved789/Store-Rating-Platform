@@ -1,7 +1,7 @@
 const UserService = require('./userService');
 const StoreRepository = require('../models/Store');
 const RatingRepository = require('../models/Rating');
-const prisma = require('../models/prismaClient');
+const StoresHelper = require('../models/storesHelper');
 
 /**
  * User Public Service - Business logic for normal user operations
@@ -37,78 +37,8 @@ class UserPublicService {
    * @returns {Promise<Object>} { data: stores[], total: number }
    */
   static async getStoresWithRatings(userId, options = {}) {
-    const {
-      page = 1,
-      limit = 10,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      search,
-      name,
-      address,
-    } = options;
-
-    const skip = (page - 1) * limit;
-    const where = {};
-
-    // Support both 'search' (searches name and address) and individual 'name'/'address' filters
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
-      ];
-    } else {
-      if (name) {
-        where.name = { contains: name, mode: 'insensitive' };
-      }
-      if (address) {
-        where.address = { contains: address, mode: 'insensitive' };
-      }
-    }
-
-    const [stores, total] = await Promise.all([
-      prisma.store.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          ratings: {
-            select: {
-              rating: true,
-              userId: true,
-            },
-          },
-        },
-      }),
-      prisma.store.count({ where }),
-    ]);
-
-    // Add average rating and user's rating to each store
-    const storesWithRatings = stores.map((store) => {
-      // Calculate average rating
-      const avgRating =
-        store.ratings.length > 0
-          ? (store.ratings.reduce((sum, r) => sum + r.rating, 0) / store.ratings.length).toFixed(2)
-          : null;
-
-      // Find user's rating for this store
-      const userRating = store.ratings.find((r) => r.userId === userId)?.rating || null;
-
-      return {
-        id: store.id,
-        name: store.name,
-        email: store.email,
-        address: store.address,
-        ownerId: store.ownerId,
-        averageRating: avgRating ? parseFloat(avgRating) : null,
-        userRating, // User's own rating or null
-        totalRatings: store.ratings.length,
-        createdAt: store.createdAt,
-        updatedAt: store.updatedAt,
-      };
-    });
-
-    return { data: storesWithRatings, total };
+    // Use direct database helper to bypass adapter issues
+    return StoresHelper.getStoresWithRatings(userId, options);
   }
 
   /**

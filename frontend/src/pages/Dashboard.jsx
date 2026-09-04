@@ -1,79 +1,177 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styles/dashboard.css';
 
 /**
- * Dashboard Page (Placeholder)
- * Role-specific dashboards will be implemented in later tasks
+ * Dashboard Page - Beautiful and functional home page
  */
 export const Dashboard = () => {
   const { user, userRole } = useAuth();
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <h1>Dashboard</h1>
-      <p>Welcome, {user?.name}!</p>
-      <p>Your role: {userRole}</p>
-
-      {userRole === 'ADMIN' && (
-        <div>
-          <h2>Admin Dashboard</h2>
-          <p>Go to admin pages to manage stores and users.</p>
-          <Link
-            to="/admin"
-            style={{
-              display: 'inline-block',
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#007bff',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '4px',
-            }}
-          >
-            Go to Admin Dashboard
-          </Link>
+    <div className="dashboard-container">
+      {/* Welcome Banner */}
+      <div className="dashboard-banner">
+        <div className="banner-content">
+          <h1>Welcome back, {user?.name}! 👋</h1>
+          <p className="banner-subtitle">
+            {userRole === 'ADMIN' && 'Manage your platform with power and control'}
+            {userRole === 'STORE_OWNER' && 'Monitor your store\'s reputation and customer ratings'}
+            {userRole === 'USER' && 'Discover amazing stores and share your ratings'}
+          </p>
         </div>
-      )}
+      </div>
 
-      {userRole === 'USER' && (
-        <div>
-          <h2>User Dashboard</h2>
-          <p>Browse stores and submit your ratings.</p>
-          <Link
-            to="/stores"
-            style={{
-              display: 'inline-block',
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#28a745',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '4px',
-            }}
-          >
-            Browse Stores
-          </Link>
+      <div className="dashboard-content">
+        {/* Stats Section */}
+        <div className="dashboard-stats">
+          <div className="stat-card">
+            <div className="stat-icon role-badge">👤</div>
+            <h3>Role</h3>
+            <p className="stat-value">
+              {userRole === 'ADMIN' && 'Administrator'}
+              {userRole === 'STORE_OWNER' && 'Store Owner'}
+              {userRole === 'USER' && 'Regular User'}
+            </p>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">✉️</div>
+            <h3>Email</h3>
+            <p className="stat-value">{user?.email}</p>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">📅</div>
+            <h3>Member Since</h3>
+            <p className="stat-value">
+              {new Date(user?.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                year: 'numeric',
+              })}
+            </p>
+          </div>
         </div>
-      )}
 
-      {userRole === 'STORE_OWNER' && (
-        <div>
-          <h2>Store Owner Dashboard</h2>
-          <p>View your store ratings and statistics.</p>
-          <Link
-            to="/store-owner"
-            style={{
-              display: 'inline-block',
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#ffc107',
-              color: '#000',
-              textDecoration: 'none',
-              borderRadius: '4px',
-            }}
-          >
-            Go to Store Owner Dashboard
-          </Link>
+        {/* Role-Specific Sections */}
+        <div className="dashboard-sections">
+          {/* ADMIN SECTION */}
+          {userRole === 'ADMIN' && (
+            <div className="dashboard-section admin-section">
+              <div className="section-header">
+                <h2>👨‍💼 Admin Dashboard</h2>
+                <p>Full control over your platform</p>
+              </div>
+              <div className="section-grid">
+                <Link to="/admin/stores" className="action-card primary">
+                  <div className="action-icon">🏪</div>
+                  <h3>Manage Stores</h3>
+                  <p>Create, edit, and remove stores from your platform</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+                <Link to="/admin/users" className="action-card primary">
+                  <div className="action-icon">👥</div>
+                  <h3>Manage Users</h3>
+                  <p>View all users and manage their accounts</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+                <Link to="/admin" className="action-card primary">
+                  <div className="action-icon">📊</div>
+                  <h3>Dashboard Stats</h3>
+                  <p>View platform statistics and analytics</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* USER SECTION */}
+          {userRole === 'USER' && (
+            <div className="dashboard-section user-section">
+              <div className="section-header">
+                <h2>🛍️ Explore & Rate</h2>
+                <p>Discover great stores and share your feedback</p>
+              </div>
+              <div className="section-grid">
+                <Link to="/stores" className="action-card success">
+                  <div className="action-icon">🔍</div>
+                  <h3>Browse Stores</h3>
+                  <p>Explore all available stores and see ratings from other users</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+              </div>
+              <div className="features">
+                <h3>What you can do:</h3>
+                <ul>
+                  <li>✨ Search and filter stores by name or location</li>
+                  <li>⭐ See average ratings from all users</li>
+                  <li>📝 Submit your own ratings (1-5 stars)</li>
+                  <li>🔄 Update your ratings anytime</li>
+                  <li>🎯 Help others find great stores</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* STORE OWNER SECTION */}
+          {userRole === 'STORE_OWNER' && (
+            <div className="dashboard-section owner-section">
+              <div className="section-header">
+                <h2>📈 Store Owner Dashboard</h2>
+                <p>Monitor and improve your store's reputation</p>
+              </div>
+              <div className="section-grid">
+                <Link to="/store-owner" className="action-card warning">
+                  <div className="action-icon">📊</div>
+                  <h3>View Dashboard</h3>
+                  <p>See your store's ratings, statistics, and customer feedback</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+                <Link to="/store-owner" className="action-card warning">
+                  <div className="action-icon">⭐</div>
+                  <h3>Store Ratings</h3>
+                  <p>View detailed breakdown of ratings from your customers</p>
+                  <div className="action-arrow">→</div>
+                </Link>
+              </div>
+              <div className="features">
+                <h3>Your insights:</h3>
+                <ul>
+                  <li>⭐ Real-time average rating</li>
+                  <li>📊 Rating distribution (1-5 stars)</li>
+                  <li>👥 Total number of customer ratings</li>
+                  <li>📈 Track your reputation over time</li>
+                  <li>🎯 Improve based on customer feedback</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Quick Actions */}
+        <div className="quick-actions">
+          <h3>Quick Actions</h3>
+          <div className="actions-grid">
+            <Link to="/dashboard" className="quick-action">
+              <span className="action-label">🏠 Home</span>
+            </Link>
+            {userRole === 'USER' && (
+              <Link to="/stores" className="quick-action">
+                <span className="action-label">🛍️ Browse</span>
+              </Link>
+            )}
+            {userRole === 'ADMIN' && (
+              <Link to="/admin" className="quick-action">
+                <span className="action-label">⚙️ Admin</span>
+              </Link>
+            )}
+            {userRole === 'STORE_OWNER' && (
+              <Link to="/store-owner" className="quick-action">
+                <span className="action-label">📈 Dashboard</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

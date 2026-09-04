@@ -1,5 +1,6 @@
 const UserService = require('../services/userService');
 const JWTUtil = require('../utils/jwt');
+const SignupHelper = require('../models/signupHelper');
 
 /**
  * Authentication Controller - Handle login, logout, and signup operations
@@ -24,8 +25,8 @@ class AuthController {
         });
       }
 
-      // Create user (UserService will handle validation and hashing)
-      const user = await UserService.createUser({
+      // Create user using direct database helper (bypasses adapter issues)
+      const user = await SignupHelper.createUserDirect({
         name,
         email,
         password,
@@ -57,6 +58,7 @@ class AuthController {
         error: null,
       });
     } catch (error) {
+      console.error('Signup error:', error.message);
       // Handle specific error cases
       if (error.message.includes('User with this email already exists')) {
         return res.status(409).json({
@@ -78,7 +80,7 @@ class AuthController {
       return res.status(500).json({
         success: false,
         data: null,
-        error: 'Signup failed. Please try again.',
+        error: error.message || 'Signup failed. Please try again.',
       });
     }
   }
@@ -101,8 +103,8 @@ class AuthController {
         });
       }
 
-      // Authenticate user
-      const user = await UserService.authenticate(email, password);
+      // Authenticate user using direct database helper
+      const user = await SignupHelper.authenticateDirect(email, password);
 
       // Generate JWT token
       const token = JWTUtil.generateToken({
