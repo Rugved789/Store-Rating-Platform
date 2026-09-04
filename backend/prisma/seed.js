@@ -8,7 +8,7 @@ require('dotenv').config();
 
 // Create connection pool for seeding
 const pool = new Pool({
-  connectionString: "postgresql://neondb_owner:npg_6ILD4oAQKiFl@ep-shiny-waterfall-aym4asq8-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require",
+  connectionString: process.env.DATABASE_URL,
 });
 
 // Create Prisma Client with adapter for seeding

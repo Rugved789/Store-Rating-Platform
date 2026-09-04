@@ -1,7 +1,7 @@
 const UserService = require('./userService');
 const UserRepository = require('../models/User');
 const StoreRepository = require('../models/Store');
-const prisma = require('../models/prismaClient');
+const AdminHelper = require('../models/adminHelper');
 
 /**
  * Admin Service - Business logic for admin operations
@@ -12,17 +12,13 @@ class AdminService {
    * @returns {Promise<Object>} Dashboard data with counts and statistics
    */
   static async getDashboard() {
-    const [totalUsers, totalStores, totalRatings] = await Promise.all([
-      UserRepository.count(),
-      StoreRepository.count(),
-      prisma.rating.count(),
-    ]);
-
-    return {
-      totalUsers,
-      totalStores,
-      totalRatings,
-    };
+    try {
+      const stats = await AdminHelper.getDashboardStats();
+      return stats;
+    } catch (error) {
+      console.error('Dashboard error:', error.message);
+      throw error;
+    }
   }
 
   /**
@@ -65,7 +61,7 @@ class AdminService {
    * @returns {Promise<Object>} { data: stores[], total: number }
    */
   static async getStores(options) {
-    return StoreRepository.findAll(options);
+    return AdminHelper.getAllStores(options);
   }
 
   /**
@@ -118,7 +114,7 @@ class AdminService {
    * @returns {Promise<Object>} { data: users[], total: number }
    */
   static async getUsers(options) {
-    return UserRepository.findAll(options);
+    return AdminHelper.getAllUsers(options);
   }
 
   /**
@@ -131,37 +127,6 @@ class AdminService {
 
     if (!user) {
       throw new Error('User not found');
-    }
-
-    // If user is STORE_OWNER, include their store's average rating
-    if (user.role === 'STORE_OWNER') {
-      const store = await prisma.store.findFirst({
-        where: { ownerId: userId },
-        include: {
-          ratings: {
-            select: {
-              rating: true,
-            },
-          },
-        },
-      });
-
-      if (store) {
-        const avgRating =
-          store.ratings.length > 0
-            ? (store.ratings.reduce((sum, r) => sum + r.rating, 0) / store.ratings.length).toFixed(2)
-            : null;
-
-        return {
-          ...UserService.formatUserResponse(user),
-          storeInfo: {
-            storeId: store.id,
-            storeName: store.name,
-            averageRating: avgRating ? parseFloat(avgRating) : null,
-            totalRatings: store.ratings.length,
-          },
-        };
-      }
     }
 
     return UserService.formatUserResponse(user);
@@ -190,20 +155,8 @@ class AdminService {
    * @returns {Promise<Object>} Confirmation
    */
   static async deleteUser(userId) {
-    // Prevent deleting the last admin
-    const adminCount = await prisma.user.count({
-      where: { role: 'ADMIN' },
-    });
-
-    if (adminCount === 1) {
-      const user = await UserRepository.findById(userId);
-      if (user && user.role === 'ADMIN') {
-        throw new Error('Cannot delete the last admin user');
-      }
-    }
-
-    await UserRepository.delete(userId);
-    return { message: 'User deleted successfully' };
+    const result = await AdminHelper.deleteUser(userId);
+    return { message: 'User deleted successfully', data: result };
   }
 
   /**
@@ -212,14 +165,8 @@ class AdminService {
    * @returns {Promise<Object>} Confirmation
    */
   static async deleteStore(storeId) {
-    const store = await StoreRepository.findById(storeId);
-
-    if (!store) {
-      throw new Error('Store not found');
-    }
-
-    await StoreRepository.delete(storeId);
-    return { message: 'Store deleted successfully' };
+    const result = await AdminHelper.deleteStore(storeId);
+    return { message: 'Store deleted successfully', data: result };
   }
 }
 

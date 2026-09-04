@@ -35,7 +35,7 @@ export const adminService = {
         params,
         withCredentials: true
       });
-      return { success: true, data: response.data.data };
+      return { success: true, data: response.data.data, pagination: response.data.pagination };
     } catch (error) {
       return {
         success: false,
@@ -45,11 +45,31 @@ export const adminService = {
   },
 
   /**
+   * Get users with pagination, sorting, and filtering
+   */
+  getUsers: async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE}/admin/users`, { 
+        params,
+        withCredentials: true
+      });
+      return { success: true, data: response.data.data, pagination: response.data.pagination };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error?.message || 'Failed to fetch users',
+      };
+    }
+  },
+
+  /**
    * Get store by ID
    */
   getStore: async (id) => {
     try {
-      const response = await axios.get(`${API_BASE}/admin/stores/${id}`);
+      const response = await axios.get(`${API_BASE}/admin/stores/${id}`, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {
@@ -64,7 +84,9 @@ export const adminService = {
    */
   createStore: async (storeData) => {
     try {
-      const response = await axios.post(`${API_BASE}/admin/stores`, storeData);
+      const response = await axios.post(`${API_BASE}/admin/stores`, storeData, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {
@@ -79,7 +101,9 @@ export const adminService = {
    */
   deleteStore: async (id) => {
     try {
-      const response = await axios.delete(`${API_BASE}/admin/stores/${id}`);
+      const response = await axios.delete(`${API_BASE}/admin/stores/${id}`, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {
@@ -94,7 +118,9 @@ export const adminService = {
    */
   createUser: async (userData) => {
     try {
-      const response = await axios.post(`${API_BASE}/admin/users`, userData);
+      const response = await axios.post(`${API_BASE}/admin/users`, userData, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {
@@ -109,7 +135,9 @@ export const adminService = {
    */
   deleteUser: async (id) => {
     try {
-      const response = await axios.delete(`${API_BASE}/admin/users/${id}`);
+      const response = await axios.delete(`${API_BASE}/admin/users/${id}`, {
+        withCredentials: true
+      });
       return { success: true, data: response.data.data };
     } catch (error) {
       return {

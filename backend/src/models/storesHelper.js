@@ -17,7 +17,7 @@ class StoresHelper {
     } = options;
 
     const client = new Client({
-      connectionString: "postgresql://neondb_owner:npg_6ILD4oAQKiFl@ep-shiny-waterfall-aym4asq8-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+      connectionString: process.env.DATABASE_URL
     });
 
     try {
@@ -111,7 +111,7 @@ class StoresHelper {
    */
   static async getStoreById(storeId) {
     const client = new Client({
-      connectionString: "postgresql://neondb_owner:npg_6ILD4oAQKiFl@ep-shiny-waterfall-aym4asq8-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+      connectionString: process.env.DATABASE_URL
     });
 
     try {
@@ -148,7 +148,7 @@ class StoresHelper {
     } = options;
 
     const client = new Client({
-      connectionString: "postgresql://neondb_owner:npg_6ILD4oAQKiFl@ep-shiny-waterfall-aym4asq8-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+      connectionString: process.env.DATABASE_URL
     });
 
     try {

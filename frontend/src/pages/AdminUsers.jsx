@@ -34,14 +34,14 @@ export const AdminUsers = () => {
     setLoading(true);
     setError('');
 
-    const result = await adminService.getStores({
+    const result = await adminService.getUsers({
       page: pagination.page,
       limit: pagination.limit,
     });
 
     if (result.success) {
-      setUsers(result.data.stores || []);
-      setPagination(result.data.pagination);
+      setUsers(result.data || []);
+      setPagination(result.pagination);
     } else {
       setError(result.error);
     }

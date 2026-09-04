@@ -51,14 +51,13 @@ class AdminController {
 
       return res.status(200).json({
         success: true,
-        data: {
-          stores: result.data,
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: result.total,
-            pages: Math.ceil(result.total / limitNum),
-          },
+        data: result.data,
+        total: result.total,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          pages: Math.ceil(result.total / limitNum),
         },
         error: null,
       });
@@ -159,14 +158,13 @@ class AdminController {
 
       return res.status(200).json({
         success: true,
-        data: {
-          users: result.data,
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: result.total,
-            pages: Math.ceil(result.total / limitNum),
-          },
+        data: result.data,
+        total: result.total,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          pages: Math.ceil(result.total / limitNum),
         },
         error: null,
       });

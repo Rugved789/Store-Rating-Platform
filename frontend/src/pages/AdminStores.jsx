@@ -40,8 +40,8 @@ export const AdminStores = () => {
     });
 
     if (result.success) {
-      setStores(result.data.stores);
-      setPagination(result.data.pagination);
+      setStores(result.data);
+      setPagination(result.pagination);
     } else {
       setError(result.error);
     }
